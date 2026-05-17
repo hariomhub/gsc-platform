@@ -1,0 +1,361 @@
+import type { Request, Response, NextFunction } from 'express';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2';
+import pool from '../config/database.js';
+import { uploadToBlob, deleteFromBlob } from '../services/azure.service.js';
+import { notifyAllMembers, NOTIF_TYPES } from '../services/notification.service.js';
+
+const paginate = (query: any, total: number) => {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 12));
+    const offset = (page - 1) * limit;
+    const totalPages = Math.ceil(total / limit);
+    return { page, limit, offset, totalPages };
+};
+
+// ─── Products ─────────────────────────────────────────────────────────────────
+
+export const getProducts = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { category, search } = req.query;
+        const params: any[] = [];
+        let where = '1=1';
+
+        if (category) { where += ' AND p.category = ?'; params.push(category); }
+        if (search) {
+            where += ' AND (p.name LIKE ? OR p.vendor LIKE ? OR p.short_description LIKE ?)';
+            const s = `%${search}%`;
+            params.push(s, s, s);
+        }
+
+        const [[{ total }]] = await (pool.query as any)(`SELECT COUNT(*) AS total FROM products p WHERE ${where}`, params);
+        const { page, limit, offset, totalPages } = paginate(req.query, total);
+
+        const [rows] = await (pool.query as any)(
+            `SELECT p.id, p.name, p.vendor, p.category, p.short_description, p.portal_url, p.created_at,
+                    ROUND(COALESCE(AVG(r.rating), 0), 1) AS avg_rating,
+                    COUNT(r.id) AS review_count
+             FROM products p
+             LEFT JOIN product_user_reviews r ON r.product_id = p.id
+             WHERE ${where}
+             GROUP BY p.id
+             ORDER BY p.created_at DESC
+             LIMIT ? OFFSET ?`,
+            [...params, limit, offset]
+        );
+
+        res.json({ success: true, data: rows, total, page, limit, totalPages });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const getProductById = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        const [[product]] = await (pool.query as any)(
+            `SELECT p.*,
+                    ROUND(COALESCE(AVG(r.rating), 0), 1) AS avg_rating,
+                    COUNT(r.id) AS review_count
+             FROM products p
+             LEFT JOIN product_user_reviews r ON r.product_id = p.id
+             WHERE p.id = ?
+             GROUP BY p.id`,
+            [id]
+        );
+        if (!product) res.status(404).json({ success: false, message: 'Product not found.' });
+
+        const [media] = await (pool.query as any)('SELECT * FROM product_media WHERE product_id = ? ORDER BY display_order ASC, id ASC', [id]);
+        const [featureTests] = await (pool.query as any)('SELECT * FROM product_feature_tests WHERE product_id = ? ORDER BY display_order ASC, id ASC', [id]);
+        const [evidences] = await (pool.query as any)(
+            `SELECT pe.*, pft.feature_name AS feature_test_name
+             FROM product_evidences pe
+             LEFT JOIN product_feature_tests pft ON pft.id = pe.feature_test_id
+             WHERE pe.product_id = ? ORDER BY pft.display_order ASC, pft.id ASC, pe.created_at DESC`,
+            [id]
+        );
+        const [userReviews] = await (pool.query as any)(
+            `SELECT r.*, u.name AS user_name, u.photo_url AS user_photo
+             FROM product_user_reviews r
+             JOIN users u ON u.id = r.user_id
+             WHERE r.product_id = ?
+             ORDER BY r.created_at DESC`,
+            [id]
+        );
+
+        if (product.key_features && typeof product.key_features === 'string') {
+            try { product.key_features = JSON.parse(product.key_features); } catch { /* keep as string */ }
+        }
+
+        res.json({ success: true, data: { ...product, media, featureTests, evidences, userReviews } });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const createProduct = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { name, vendor, category, portal_url, short_description, overview, version_tested, key_features } = req.body;
+        const kf = key_features
+            ? (typeof key_features === 'string' ? key_features : JSON.stringify(key_features))
+            : null;
+
+        const [result] = await (pool.query as any)(
+            `INSERT INTO products (name, vendor, category, portal_url, short_description, overview, version_tested, key_features)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [name.trim(), vendor.trim(), category || null, portal_url || null,
+            short_description || null, overview || null, version_tested || null, kf]
+        );
+        const [[row]] = await (pool.query as any)('SELECT * FROM products WHERE id = ?', [(result as any).insertId]);
+
+        // Notify all members — fire and forget
+        notifyAllMembers(
+            NOTIF_TYPES.PRODUCT_REVIEW_ADDED,
+            `New AI Product Review: ${name.trim()}`,
+            `${vendor.trim()} — now reviewed on AI Risk Council`,
+            { url: '/services/product-reviews', productId: String((result as any).insertId) }
+        );
+
+        res.status(201).json({ success: true, data: row });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const updateProduct = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { name, vendor, category, portal_url, short_description, overview, version_tested, key_features } = req.body;
+
+        const [[check]] = await (pool.query as any)('SELECT id FROM products WHERE id = ?', [id]);
+        if (!check) res.status(404).json({ success: false, message: 'Product not found.' });
+
+        const kf = key_features
+            ? (typeof key_features === 'string' ? key_features : JSON.stringify(key_features))
+            : null;
+
+        await (pool.query as any)(
+            `UPDATE products SET name=?, vendor=?, category=?, portal_url=?,
+             short_description=?, overview=?, version_tested=?, key_features=?
+             WHERE id=?`,
+            [name.trim(), vendor.trim(), category || null, portal_url || null,
+            short_description || null, overview || null, version_tested || null, kf, id]
+        );
+        const [[row]] = await (pool.query as any)('SELECT * FROM products WHERE id = ?', [id]);
+        res.json({ success: true, data: row });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const deleteProduct = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const [[check]] = await (pool.query as any)('SELECT id FROM products WHERE id = ?', [id]);
+        if (!check) res.status(404).json({ success: false, message: 'Product not found.' });
+
+        const [mediaFiles]    = await (pool.query as any)('SELECT url FROM product_media WHERE product_id = ?', [id]);
+        const [evidenceFiles] = await (pool.query as any)('SELECT file_url FROM product_evidences WHERE product_id = ?', [id]);
+        await Promise.all([
+            ...mediaFiles.map((m) => deleteFromBlob(m.url)),
+            ...evidenceFiles.map((e) => deleteFromBlob(e.file_url)),
+        ]);
+
+        await (pool.query as any)('DELETE FROM products WHERE id = ?', [id]);
+        res.json({ success: true, message: 'Product deleted.' });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+// ─── Feature Tests ────────────────────────────────────────────────────────────
+
+export const addFeatureTest = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { feature_name, test_method, result, score, comments, display_order } = req.body;
+
+        const [[check]] = await (pool.query as any)('SELECT id FROM products WHERE id = ?', [id]);
+        if (!check) res.status(404).json({ success: false, message: 'Product not found.' });
+
+        const [ins] = await (pool.query as any)(
+            `INSERT INTO product_feature_tests (product_id, feature_name, test_method, result, score, comments, display_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, feature_name.trim(), test_method || null, result || null,
+                score != null && score !== '' ? parseFloat(score) : null, comments || null, display_order || 0]
+        );
+        const [[row]] = await (pool.query as any)('SELECT * FROM product_feature_tests WHERE id = ?', [(ins as any).insertId]);
+        res.status(201).json({ success: true, data: row });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const updateFeatureTest = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { productId, testId } = req.params;
+        const { feature_name, test_method, result, score, comments, display_order } = req.body;
+
+        const [[check]] = await (pool.query as any)('SELECT id FROM product_feature_tests WHERE id = ? AND product_id = ?', [testId, productId]);
+        if (!check) res.status(404).json({ success: false, message: 'Feature test not found.' });
+
+        await (pool.query as any)(
+            `UPDATE product_feature_tests SET feature_name=?, test_method=?, result=?, score=?, comments=?, display_order=? WHERE id=?`,
+            [feature_name.trim(), test_method || null, result || null,
+            score != null && score !== '' ? parseFloat(score) : null, comments || null, display_order || 0, testId]
+        );
+        const [[row]] = await (pool.query as any)('SELECT * FROM product_feature_tests WHERE id = ?', [testId]);
+        res.json({ success: true, data: row });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const deleteFeatureTest = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { productId, testId } = req.params;
+        const [[check]] = await (pool.query as any)('SELECT id FROM product_feature_tests WHERE id = ? AND product_id = ?', [testId, productId]);
+        if (!check) res.status(404).json({ success: false, message: 'Feature test not found.' });
+        await (pool.query as any)('DELETE FROM product_feature_tests WHERE id = ?', [testId]);
+        res.json({ success: true, message: 'Feature test deleted.' });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+
+export const uploadMedia = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        const [[check]] = await (pool.query as any)('SELECT id FROM products WHERE id = ?', [id]);
+        if (!check) res.status(404).json({ success: false, message: 'Product not found.' });
+        if (!req.files || req.files.length === 0) res.status(400).json({ success: false, message: 'No files uploaded.' });
+
+        const inserted: any[] = [];
+        for (const file of (req.files as any)) {
+            const url = await uploadToBlob('products/media', file.originalname, file.buffer, file.mimetype);
+            const mediaType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+            const [ins] = await (pool.query as any)(
+                'INSERT INTO product_media (product_id, type, url, label, display_order) VALUES (?, ?, ?, ?, ?)',
+                [id, mediaType, url, file.originalname, 0]
+            );
+            const [[row]] = await (pool.query as any)('SELECT * FROM product_media WHERE id = ?', [(ins as any).insertId]);
+            inserted.push(row);
+        }
+        res.status(201).json({ success: true, data: inserted });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const deleteMedia = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { productId, mediaId } = req.params;
+        const [[row]] = await (pool.query as any)('SELECT * FROM product_media WHERE id = ? AND product_id = ?', [mediaId, productId]);
+        if (!row) res.status(404).json({ success: false, message: 'Media not found.' });
+
+        await deleteFromBlob(row.url);
+        await (pool.query as any)('DELETE FROM product_media WHERE id = ?', [mediaId]);
+        res.json({ success: true, message: 'Media deleted.' });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+// ─── Evidences ────────────────────────────────────────────────────────────────
+
+export const uploadEvidence = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        const [[check]] = await (pool.query as any)('SELECT id FROM products WHERE id = ?', [id]);
+        if (!check) res.status(404).json({ success: false, message: 'Product not found.' });
+        if (!req.files || req.files.length === 0) res.status(400).json({ success: false, message: 'No files uploaded.' });
+
+        const { feature_test_id } = req.body;
+        const ftId = feature_test_id ? parseInt(feature_test_id, 10) || null : null;
+        if (ftId) {
+            const [[ftCheck]] = await (pool.query as any)('SELECT id FROM product_feature_tests WHERE id = ? AND product_id = ?', [ftId, id]);
+            if (!ftCheck) res.status(400).json({ success: false, message: 'Invalid feature test.' });
+        }
+
+        const inserted: any[] = [];
+        for (const file of (req.files as any)) {
+            const file_url = await uploadToBlob('products/evidences', file.originalname, file.buffer, file.mimetype);
+            const [ins] = await (pool.query as any)(
+                'INSERT INTO product_evidences (product_id, feature_test_id, file_url, file_name, file_type) VALUES (?, ?, ?, ?, ?)',
+                [id, ftId, file_url, file.originalname, file.mimetype]
+            );
+            const [[row]] = await (pool.query as any)(
+                `SELECT pe.*, pft.feature_name AS feature_test_name FROM product_evidences pe LEFT JOIN product_feature_tests pft ON pft.id = pe.feature_test_id WHERE pe.id = ?`,
+                [(ins as any).insertId]
+            );
+            inserted.push(row);
+        }
+        res.status(201).json({ success: true, data: inserted });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const deleteEvidence = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { productId, evidenceId } = req.params;
+        const [[row]] = await (pool.query as any)('SELECT * FROM product_evidences WHERE id = ? AND product_id = ?', [evidenceId, productId]);
+        if (!row) res.status(404).json({ success: false, message: 'Evidence not found.' });
+
+        await deleteFromBlob(row.file_url);
+        await (pool.query as any)('DELETE FROM product_evidences WHERE id = ?', [evidenceId]);
+        res.json({ success: true, message: 'Evidence deleted.' });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+// ─── User Reviews ─────────────────────────────────────────────────────────────
+
+export const submitUserReview = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { rating, comment } = req.body;
+        const userId = (req.user as any).id;
+
+        const [[check]] = await (pool.query as any)('SELECT id FROM products WHERE id = ?', [id]);
+        if (!check) res.status(404).json({ success: false, message: 'Product not found.' });
+
+        const parsedRating = parseInt(rating, 10);
+        if (!parsedRating || parsedRating < 1 || parsedRating > 5) {
+            res.status(422).json({ success: false, message: 'Rating must be between 1 and 5.' });
+        }
+
+        const [[existing]] = await (pool.query as any)('SELECT id FROM product_user_reviews WHERE product_id = ? AND user_id = ?', [id, userId]);
+        if (existing) {
+            await (pool.query as any)('UPDATE product_user_reviews SET rating=?, comment=?, updated_at=NOW() WHERE product_id=? AND user_id=?', [parsedRating, comment || null, id, userId]);
+        } else {
+            await (pool.query as any)('INSERT INTO product_user_reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)', [id, userId, parsedRating, comment || null]);
+        }
+
+        const [[stats]] = await (pool.query as any)('SELECT ROUND(COALESCE(AVG(rating),0),1) AS avg_rating, COUNT(id) AS review_count FROM product_user_reviews WHERE product_id = ?', [id]);
+        res.json({ success: true, data: stats });
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+export const deleteUserReview = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { reviewId } = req.params;
+        const [[row]] = await (pool.query as any)('SELECT * FROM product_user_reviews WHERE id = ?', [reviewId]);
+        if (!row) res.status(404).json({ success: false, message: 'Review not found.' });
+
+        if ((req.user as any).role !== 'founding_member' && row.user_id !== (req.user as any).id) {
+            res.status(403).json({ success: false, message: 'You can only delete your own reviews.' });
+        }
+        await (pool.query as any)('DELETE FROM product_user_reviews WHERE id = ?', [reviewId]);
+        res.json({ success: true, message: 'Review deleted.' });
+    } catch (err: any) {
+        next(err);
+    }
+};
