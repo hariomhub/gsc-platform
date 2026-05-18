@@ -2,7 +2,7 @@
 /**
  * notificationService.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Firebase Cloud Messaging service for AI Risk Council.
+ * Firebase Cloud Messaging service for Global Sustainability Council.
  *
  * Two delivery tracks:
  *   IMMEDIATE  — urgent personal notifications sent right away
@@ -298,7 +298,7 @@ export const sendDigestToAllMembers = async () => {
         if (typeCounts[NOTIF_TYPES.NOMINEE_ADDED])        summaryParts.push(`${typeCounts[NOTIF_TYPES.NOMINEE_ADDED]} new nominee${typeCounts[NOTIF_TYPES.NOMINEE_ADDED] > 1 ? 's' : ''}`);
         if (typeCounts[NOTIF_TYPES.WINNER_ANNOUNCED])     summaryParts.push(`${typeCounts[NOTIF_TYPES.WINNER_ANNOUNCED]} award winner${typeCounts[NOTIF_TYPES.WINNER_ANNOUNCED] > 1 ? 's' : ''} announced`);
 
-        const title = "What's new on AI Risk Council";
+        const title = "What's new on Global Sustainability Council";
         const body  = summaryParts.length > 0
             ? summaryParts.join(' · ')
             : `${pending.length} new update${pending.length > 1 ? 's' : ''} available`;

@@ -112,7 +112,7 @@ export const createProduct = async(req: Request, res: Response, next: NextFuncti
         notifyAllMembers(
             NOTIF_TYPES.PRODUCT_REVIEW_ADDED,
             `New AI Product Review: ${name.trim()}`,
-            `${vendor.trim()} — now reviewed on AI Risk Council`,
+            `${vendor.trim()} — now reviewed on Global Sustainability Council`,
             { url: '/services/product-reviews', productId: String((result as any).insertId) }
         );
 

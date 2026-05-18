@@ -11,7 +11,7 @@ export const getPendingNews = async(req: Request, res: Response): Promise<void> 
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT id, title, summary, source, image_url, article_url, published_at, fetched_at, created_at
+      SELECT id, title, summary, source_name as source, image_url, link as article_url, created_at as published_at, fetched_at, created_at
       FROM news 
       WHERE is_automated = TRUE AND status = 'PENDING'
     `;
@@ -19,7 +19,7 @@ export const getPendingNews = async(req: Request, res: Response): Promise<void> 
     const params: any[] = [];
 
     if (search) {
-      query += ` AND (title LIKE ? OR source LIKE ?)`;
+      query += ` AND (title LIKE ? OR source_name LIKE ?)`;
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -33,7 +33,7 @@ export const getPendingNews = async(req: Request, res: Response): Promise<void> 
     const countParams = [];
     
     if (search) {
-      countQuery += ` AND (title LIKE ? OR source LIKE ?)`;
+      countQuery += ` AND (title LIKE ? OR source_name LIKE ?)`;
       countParams.push(`%${search}%`, `%${search}%`);
     }
 
@@ -64,7 +64,7 @@ export const getApprovedNews = async(req: Request, res: Response): Promise<void>
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT id, title, summary, source, image_url, article_url, published_at, is_published, created_at
+      SELECT id, title, summary, source_name as source, image_url, link as article_url, created_at as published_at, is_published, created_at
       FROM news 
       WHERE is_automated = TRUE AND status = 'APPROVED'
     `;
@@ -72,7 +72,7 @@ export const getApprovedNews = async(req: Request, res: Response): Promise<void>
     const params: any[] = [];
 
     if (search) {
-      query += ` AND (title LIKE ? OR source LIKE ?)`;
+      query += ` AND (title LIKE ? OR source_name LIKE ?)`;
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -86,7 +86,7 @@ export const getApprovedNews = async(req: Request, res: Response): Promise<void>
     const countParams = [];
     
     if (search) {
-      countQuery += ` AND (title LIKE ? OR source LIKE ?)`;
+      countQuery += ` AND (title LIKE ? OR source_name LIKE ?)`;
       countParams.push(`%${search}%`, `%${search}%`);
     }
 

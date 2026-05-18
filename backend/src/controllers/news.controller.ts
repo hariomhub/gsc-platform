@@ -24,7 +24,8 @@ export const getNews = async(req: Request, res: Response, next: NextFunction): P
 
         const [rows] = await (pool.query as any)(
             `SELECT *,
-             COALESCE(published_at, created_at) as sort_date
+             created_at as sort_date,
+             created_at as published_at
              FROM news ${whereClause}
              ORDER BY sort_date DESC
              LIMIT ? OFFSET ?`,

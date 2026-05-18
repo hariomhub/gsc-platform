@@ -1,7 +1,7 @@
 /**
  * emailService.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Production email service for AI Risk Council.
+ * Production email service for Global Sustainability Council.
  *
  * Provider-agnostic SMTP via Nodemailer. Supports Gmail, SendGrid, Azure
  * Communication Services, and any standard SMTP relay.
@@ -12,7 +12,7 @@
  *  SMTP_SECURE    "true" for port 465, omit/false for port 587
  *  SMTP_USER     Your SMTP username / email address
  *  SMTP_PASS     App password or API key
- *  SMTP_FROM_NAME   Display name (default: "AI Risk Council")
+ *  SMTP_FROM_NAME   Display name (default: "Global Sustainability Council")
  *  SMTP_FROM_EMAIL  Sender email (default: value of SMTP_USER)
  *  APP_URL      Your public domain (default: Azure App Service URL)
  *
@@ -52,12 +52,12 @@ const getTransporter = () => {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const FROM = () =>
-  `"${process.env.SMTP_FROM_NAME || 'AI Risk Council'}" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`;
+  `"${process.env.SMTP_FROM_NAME || 'Global Sustainability Council'}" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`;
 
 // EMAIL_BASE_URL is dedicated to email links — always points to the live site.
 // Falls back to APP_URL only if it looks like a public domain (not localhost).
 // Hardcoded Azure URL is the final fallback so emails are never broken in dev.
-const PRODUCTION_URL = 'https://riskaicouncil-fsgmh0erfjh0g6g4.eastasia-01.azurewebsites.net';
+const PRODUCTION_URL = 'https://globalsustainabilitycouncil-fsgmh0erfjh0g6g4.eastasia-01.azurewebsites.net';
 const APP_URL = () => {
   const explicit = process.env.EMAIL_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, '');
@@ -105,7 +105,7 @@ const buildGCalUrl = (title, dateStr, location) => {
       action:  'TEMPLATE',
       text:   title,
       dates:  `${fmt(start)}/${fmt(end)}`,
-      details: `AI Risk Council Event — ${APP_URL()}/events`,
+      details: `Global Sustainability Council Event — ${APP_URL()}/events`,
       location: location || '',
     });
     return `https://calendar.google.com/calendar/render?${p.toString()}`;
@@ -170,7 +170,7 @@ const layout = (bodyHtml, previewText = '') => `
  <meta name="viewport" content="width=device-width,initial-scale=1" />
  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
  <meta name="x-apple-disable-message-reformatting" />
- <title>AI Risk Council</title>
+ <title>Global Sustainability Council</title>
  <!--[if mso]>
  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
  <![endif]-->
@@ -229,8 +229,8 @@ const layout = (bodyHtml, previewText = '') => `
         &nbsp;&middot;&nbsp;
         <a href="${APP_URL()}/contact" style="color:#1A4731;text-decoration:none;font-weight:600;">Contact Us</a>
        </p>
-       <p style="margin:0;font-size:11px;color:#94a3b8;">© ${new Date().getFullYear()} AI Risk Council. All rights reserved.</p>
-       <p style="margin:6px 0 0;font-size:11px;color:#cbd5e1;">You received this email because you have an account on the AI Risk Council platform.</p>
+       <p style="margin:0;font-size:11px;color:#94a3b8;">© ${new Date().getFullYear()} Global Sustainability Council. All rights reserved.</p>
+       <p style="margin:6px 0 0;font-size:11px;color:#cbd5e1;">You received this email because you have an account on the Global Sustainability Council platform.</p>
       </td>
      </tr>
 
@@ -297,7 +297,7 @@ export const sendWelcomeEmail = ({ name, email, role, organizationName }) => {
        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         ${checkListItem('• &nbsp;Our team reviews your application')}
         ${checkListItem('• &nbsp;You receive an approval confirmation email')}
-        ${checkListItem('• &nbsp;Log in for full access to the ARC platform')}
+        ${checkListItem('• &nbsp;Log in for full access to the GSC platform')}
        </table>
       </td>
      </tr>
@@ -305,12 +305,12 @@ export const sendWelcomeEmail = ({ name, email, role, organizationName }) => {
 
     ${ctaButton('Explore the Platform', APP_URL())}
   `,
-  `Welcome to AI Risk Council, ${firstName}! Your account is pending review.`);
+  `Welcome to Global Sustainability Council, ${firstName}! Your account is pending review.`);
 
   send({
     from:  FROM(),
     to:   email,
-    subject: `Welcome to AI Risk Council, ${firstName}! `,
+    subject: `Welcome to Global Sustainability Council, ${firstName}! `,
     html,
   });
 };
@@ -329,7 +329,7 @@ export const sendAccountApprovedEmail = ({ name, email, role, profile_badge }) =
   const html = layout(`
     <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;color:#1e293b;">You're in, ${firstName}!</h2>
     <p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.65;">
-      Your AI Risk Council account has been reviewed and <strong style="color:#15803d;">approved</strong>. 
+      Your Global Sustainability Council account has been reviewed and <strong style="color:#15803d;">approved</strong>. 
       You now have full access to the platform.
     </p>
 
@@ -355,10 +355,10 @@ export const sendAccountApprovedEmail = ({ name, email, role, profile_badge }) =
        <p style="margin:0 0 12px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.1em;">Available to you now</p>
        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         ${checkListItem('• &nbsp;Browse research papers, whitepapers &amp; resources')}
-        ${checkListItem('• &nbsp;Register for upcoming AI governance events')}
+        ${checkListItem('• &nbsp;Register for upcoming Sustainability governance events')}
         ${checkListItem('• &nbsp;Post and answer questions in Community Q&amp;A')}
-        ${checkListItem('• &nbsp;Submit nominations for the AI Risk Awards')}
-        ${checkListItem('• &nbsp;Explore the AI Risk Framework')}
+        ${checkListItem('• &nbsp;Submit nominations for the GSC Awards')}
+        ${checkListItem('• &nbsp;Explore the GSC Framework')}
        </table>
       </td>
      </tr>
@@ -366,12 +366,12 @@ export const sendAccountApprovedEmail = ({ name, email, role, profile_badge }) =
 
     ${ctaButton('Sign In to Your Account', `${APP_URL()}/login`)}
   `,
-  `Your AI Risk Council account has been approved — welcome aboard!`);
+  `Your Global Sustainability Council account has been approved — welcome aboard!`);
 
   send({
     from:  FROM(),
     to:   email,
-    subject: `Your AI Risk Council account is approved! Success:`,
+    subject: `Your Global Sustainability Council account is approved! Success:`,
     html,
   });
 };
@@ -716,7 +716,7 @@ export const sendMembershipApplicationReceivedEmail = ({ name, email, requestedR
       ${checkListItem('• &nbsp;On approval, your role upgrades to Executive instantly')}`
     : `${checkListItem('• &nbsp;Your application is reviewed by the founding team')}
       ${checkListItem('• &nbsp;You will be contacted directly if selected')}
-      ${checkListItem('• &nbsp;Founding Members help shape the AI Risk Council\'s future')}`;
+      ${checkListItem('• &nbsp;Founding Members help shape the Global Sustainability Council\'s future')}`;
 
   const html = layout(`
     <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;color:#1e293b;">Application Received Success:</h2>
@@ -809,10 +809,10 @@ export const sendMembershipApplicationStatusEmail = ({ name, email, requestedRol
      </table>`;
 
   const approvedBenefits = requestedRole === 'founding_member'
-    ? `${checkListItem('• &nbsp;Lifetime Founding Member status on the AI Risk Council')}
+    ? `${checkListItem('• &nbsp;Lifetime Founding Member status on the Global Sustainability Council')}
       ${checkListItem('• &nbsp;Direct input on council direction and governance')}
       ${checkListItem('📅 &nbsp;Exclusive founding member events and roundtables')}
-      ${checkListItem('• &nbsp;Recognition in the AI Risk Council founding members list')}`
+      ${checkListItem('• &nbsp;Recognition in the Global Sustainability Council founding members list')}`
     : `${checkListItem('• &nbsp;Executive membership role is now active on your account')}
       ${checkListItem('• &nbsp;Access to Executive-tier resources and frameworks')}
       ${checkListItem('📅 &nbsp;Priority access to all council events')}
@@ -901,7 +901,7 @@ export const sendVerificationEmail = (email, otp) => {
   const html = layout(`
     <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;color:#1e293b;">Verify Your Email</h2>
     <p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.65;">
-      Thank you for starting your registration with the AI Risk Council. Please use the verification code below to confirm this email address.
+      Thank you for starting your registration with the Global Sustainability Council. Please use the verification code below to confirm this email address.
     </p>
 
     <!-- OTP banner -->
@@ -930,7 +930,7 @@ export const sendVerificationEmail = (email, otp) => {
      </tr>
     </table>
   `,
-  `Your AI Risk Council verification code is ${otp}`);
+  `Your Global Sustainability Council verification code is ${otp}`);
 
   send({
     from:  FROM(),

@@ -78,7 +78,7 @@ export const runMembershipExpiryCheck = async () => {
                 user.id,
                 NOTIF_TYPES.MEMBERSHIP_EXPIRING_15,
                 'Your membership expires in 15 days',
-                'Renew soon to keep your full access to AI Risk Council.',
+                'Renew soon to keep your full access to Global Sustainability Council.',
                 { url: '/membership' }
             );
         }
@@ -105,7 +105,7 @@ export const runMembershipExpiryCheck = async () => {
                 user.id,
                 NOTIF_TYPES.MEMBERSHIP_EXPIRING_7,
                 'Your membership expires in 7 days',
-                'Renew now to keep your full access to AI Risk Council.',
+                'Renew now to keep your full access to Global Sustainability Council.',
                 { url: '/membership' }
             );
         }

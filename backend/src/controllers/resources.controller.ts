@@ -373,7 +373,7 @@ export const createResource = async(req: Request, res: Response, next: NextFunct
             notifyAllMembers(
                 NOTIF_TYPES.RESOURCE_APPROVED,
                 `New Resource: ${title.trim()}`,
-                `A new ${type.replace('_', ' ')} has been published on AI Risk Council`,
+                `A new ${type.replace('_', ' ')} has been published on Global Sustainability Council`,
                 { url: '/resources', resourceId: String((result as any).insertId) }
             );
         }
@@ -501,7 +501,7 @@ export const approveResource = async(req: Request, res: Response, next: NextFunc
         notifyAllMembers(
             NOTIF_TYPES.RESOURCE_APPROVED,
             `New Resource: ${check[0].title}`,
-            `A new ${check[0].type.replace('_', ' ')} has been published on AI Risk Council`,
+            `A new ${check[0].type.replace('_', ' ')} has been published on Global Sustainability Council`,
             { url: '/resources', resourceId: String(check[0].id) }
         );
 

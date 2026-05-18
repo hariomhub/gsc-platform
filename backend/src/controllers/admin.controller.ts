@@ -68,7 +68,7 @@ export const approveUser = async(req: Request, res: Response, next: NextFunction
     try {
         const [rows] = await (pool.query as any)('SELECT id, name, email, role FROM users WHERE id = ?', [String(req.params.id)]);
         if ((rows as any).length === 0) {
-            res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
         const { role } = rows[0];
 
@@ -96,7 +96,7 @@ export const approveUser = async(req: Request, res: Response, next: NextFunction
             parseInt(String(req.params.id), 10),
             NOTIF_TYPES.ACCOUNT_APPROVED,
             'Your account has been approved!',
-            'Welcome to AI Risk Council. You now have full access to the platform.',
+            'Welcome to Global Sustainability Council. You now have full access to the platform.',
             { url: '/user/dashboard' }
         );
 
@@ -111,7 +111,7 @@ export const rejectUser = async(req: Request, res: Response, next: NextFunction)
     try {
         const [check] = await (pool.query as any)('SELECT id FROM users WHERE id = ?', [String(req.params.id)]);
         if (check.length === 0) {
-            res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
         await (pool.query as any)("UPDATE users SET status = 'rejected' WHERE id = ?", [String(req.params.id)]);
 
@@ -141,7 +141,7 @@ export const updateUserStatus = async(req: Request, res: Response, next: NextFun
 
         const [rows] = await (pool.query as any)('SELECT id, name, email, role FROM users WHERE id = ?', [String(req.params.id)]);
         if ((rows as any).length === 0) {
-            res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         await (pool.query as any)('UPDATE users SET status = ? WHERE id = ?', [status, String(req.params.id)]);
@@ -157,7 +157,7 @@ export const updateUserStatus = async(req: Request, res: Response, next: NextFun
                 parseInt(String(req.params.id), 10),
                 NOTIF_TYPES.ACCOUNT_APPROVED,
                 'Your account has been approved!',
-                'Welcome to AI Risk Council. You now have full access to the platform.',
+                'Welcome to Global Sustainability Council. You now have full access to the platform.',
                 { url: '/user/dashboard' }
             );
         } else if (status === 'rejected') {
@@ -187,7 +187,7 @@ export const updateUserRole = async(req: Request, res: Response, next: NextFunct
 
         const [check] = await (pool.query as any)('SELECT id, status FROM users WHERE id = ?', [String(req.params.id)]);
         if (check.length === 0) {
-            res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         const expiresAt = check[0].status === 'approved'
@@ -212,7 +212,7 @@ export const deleteUser = async(req: Request, res: Response, next: NextFunction)
 
         const [check] = await (pool.query as any)('SELECT id FROM users WHERE id = ?', [String(req.params.id)]);
         if (check.length === 0) {
-            res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         await (pool.query as any)('DELETE FROM users WHERE id = ?', [String(req.params.id)]);
@@ -229,7 +229,7 @@ export const createUser = async(req: Request, res: Response, next: NextFunction)
 
         const [existing] = await (pool.query as any)('SELECT id FROM users WHERE email = ?', [email.trim().toLowerCase()]);
         if (existing.length > 0) {
-            res.status(409).json({ success: false, message: 'This email is already registered.' });
+            return res.status(409).json({ success: false, message: 'This email is already registered.' });
         }
 
         const password_hash  = await bcrypt.hash(password, 12);
@@ -318,9 +318,9 @@ export const approveMembershipApplication = async(req: Request, res: Response, n
              WHERE ma.id = ?`,
             [String(req.params.id)]
         );
-        if (!app) res.status(404).json({ success: false, message: 'Application not found.' });
+        if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
         if (app.status !== 'pending') {
-            res.status(409).json({ success: false, message: 'Application has already been processed.' });
+            return res.status(409).json({ success: false, message: 'Application has already been processed.' });
         }
 
         const requestedRole = app.requested_role;
@@ -379,9 +379,9 @@ export const rejectMembershipApplication = async(req: Request, res: Response, ne
              WHERE ma.id = ?`,
             [String(req.params.id)]
         );
-        if (!app) res.status(404).json({ success: false, message: 'Application not found.' });
+        if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
         if (app.status !== 'pending') {
-            res.status(409).json({ success: false, message: 'Application has already been processed.' });
+            return res.status(409).json({ success: false, message: 'Application has already been processed.' });
         }
 
         await (pool.query as any)(
@@ -453,14 +453,14 @@ export const approveSubTypeUpgrade = async(req: Request, res: Response, next: Ne
             'SELECT id, name, email, role, professional_sub_type, pending_sub_type_upgrade FROM users WHERE id = ?',
             [String(req.params.id)]
         );
-        if (!(rows as any).length) res.status(404).json({ success: false, message: 'User not found.' });
+        if (!(rows as any).length) return res.status(404).json({ success: false, message: 'User not found.' });
 
         const u = rows[0];
         if (u.role !== 'professional' || u.professional_sub_type !== 'final_year_undergrad') {
-            res.status(409).json({ success: false, message: 'User is not a final_year_undergrad professional.' });
+            return res.status(409).json({ success: false, message: 'User is not a final_year_undergrad professional.' });
         }
         if (!u.pending_sub_type_upgrade) {
-            res.status(409).json({ success: false, message: 'No pending upgrade request for this user.' });
+            return res.status(409).json({ success: false, message: 'No pending upgrade request for this user.' });
         }
 
         if (req.body.profile_badge) {
@@ -505,9 +505,9 @@ export const rejectSubTypeUpgrade = async(req: Request, res: Response, next: Nex
             'SELECT id, name, email, pending_sub_type_upgrade FROM users WHERE id = ?',
             [String(req.params.id)]
         );
-        if (!(rows as any).length) res.status(404).json({ success: false, message: 'User not found.' });
+        if (!(rows as any).length) return res.status(404).json({ success: false, message: 'User not found.' });
         if (!rows[0].pending_sub_type_upgrade) {
-            res.status(409).json({ success: false, message: 'No pending upgrade request for this user.' });
+            return res.status(409).json({ success: false, message: 'No pending upgrade request for this user.' });
         }
 
         await (pool.query as any)(

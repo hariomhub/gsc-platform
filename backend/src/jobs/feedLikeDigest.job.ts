@@ -46,13 +46,13 @@ export const runFeedLikeDigest = async () => {
                 title = pending_count === 1
                     ? 'Someone liked your post'
                     : `${pending_count} people liked your post`;
-                body = 'Your post is getting attention on AI Risk Council.';
+                body = 'Your post is getting attention on Global Sustainability Council.';
                 url  = `/community-qna/${target_id}`;
             } else {
                 title = pending_count === 1
                     ? 'Someone liked your comment'
                     : `${pending_count} people liked your comment`;
-                body = 'Your comment is getting attention on AI Risk Council.';
+                body = 'Your comment is getting attention on Global Sustainability Council.';
 
                 // Fetch the post_id for this comment to build the URL
                 const [[comment]] = await pool.query(

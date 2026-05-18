@@ -30,7 +30,7 @@ export async function fetchSustainabilityNews(): Promise<void> {
         if ((existing as any).length > 0) continue;
 
         await pool.execute(
-          'INSERT INTO news (title, summary, link, source_type, source_name) VALUES (?,?,?,?,?)',
+          'INSERT INTO news (title, summary, link, source_type, source_name, is_automated, status, is_published, fetched_at) VALUES (?,?,?,?,?, TRUE, \'PENDING\', FALSE, NOW())',
           [
             item.title.slice(0, 255),
             item.contentSnippet?.slice(0, 500) || item.summary?.slice(0, 500) || '',
