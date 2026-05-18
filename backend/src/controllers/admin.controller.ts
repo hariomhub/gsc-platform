@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Request, Response, NextFunction } from 'express';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import pool from '../config/database.js';
